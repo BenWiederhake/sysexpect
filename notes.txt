@@ -1,0 +1,9 @@
+deb-pkg-tools ist doof.
+
+xattr existiert
+"SELinux context string"???
+→ PAX headers, is that it?
+
+Stattdessen, viel besser:
+
+apt install python3-debian
