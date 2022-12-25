@@ -7,6 +7,11 @@ import sys
 import tarfile
 
 
+if getattr(hashlib, "file_digest", None) is None:
+    print(f"Sorry, this program needs Python 3.11, for hashlib.file_digest. This seems to be running {sys.version}", file=sys.stderr)
+    exit(2)
+
+
 def tarinfo_type_to_string(info):
     if info.isreg():
         return "reg"
@@ -22,8 +27,6 @@ def tarinfo_type_to_string(info):
         return "blk"
     elif info.isfifo():
         return "fifo"
-    elif info.isdev():
-        return "dev"
     raise AssertionError(info.name, info.type)
 
 
@@ -33,18 +36,20 @@ def extract_info(debfile_object):
     # TODO: Do something with controlfile.scripts?
     scripts = controlfile.scripts()
     if scripts:
-        print(f"ignoring {len(scripts)} scripts: {scripts}")
+        print(f"ignoring {len(scripts)} scripts: {scripts.keys()}")
     datatarfile = debfile_object.data.tgz()
     # Using the datatarfile as an iterator *might* interfere with the functions "getmembers'.
     for info_member in datatarfile:
         if info_member.isreg():
-            sha256_hasher = hashlib.sha256()
             info_content_fp = datatarfile.extractfile(info_member)
             assert info_content_fp is not None, info_member
-            sha256_hasher.update(info_content_fp.read())
-            member_sha256 = sha256_hasher.hexdigest()
+            member_sha256 = hashlib.file_digest(info_content_fp, "sha256").hexdigest()
         else:
             member_sha256 = ""
+        if info_member.isdev():
+            dev_inode = (info_member.devmajor, info_member.devminor)
+        else:
+            dev_inode = (-1, -1)
         new_expectation = {
             "type": "file",
             "filetype": tarinfo_type_to_string(info_member),
@@ -52,16 +57,14 @@ def extract_info(debfile_object):
             "size": info_member.size,
             "mtime": info_member.mtime,
             "mode": info_member.mode,
-            "linkname": info_member.linkname,
+            "linkname": info_member.linkname,  # Both symlinks and hardlinks!
             "uid": info_member.uid,
             "gid": info_member.gid,
             "uname": info_member.uname,
             "gname": info_member.gname,
             "pax_headers": info_member.pax_headers,
-            # FIXME: device maj min?
-            # FIXME: link target?
-            # FIXME: LNK inode identity?
             "sha256": member_sha256,
+            "dev_inode": dev_inode,
         }
         expectations.append(new_expectation)
 
