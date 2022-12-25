@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.11
 
 from debian import debfile
 import hashlib
@@ -8,7 +8,10 @@ import tarfile
 
 
 if getattr(hashlib, "file_digest", None) is None:
-    print(f"Sorry, this program needs Python 3.11, for hashlib.file_digest. This seems to be running {sys.version}", file=sys.stderr)
+    print(
+        f"Sorry, this program needs Python 3.11, for hashlib.file_digest. This seems to be running {sys.version}",
+        file=sys.stderr,
+    )
     exit(2)
 
 
