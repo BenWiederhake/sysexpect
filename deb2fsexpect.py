@@ -68,6 +68,7 @@ def extract_info(debfile_object):
             "pax_headers": info_member.pax_headers,
             "sha256": member_sha256,
             "dev_inode": dev_inode,
+            "children": None,
         }
         expectations.append(new_expectation)
 

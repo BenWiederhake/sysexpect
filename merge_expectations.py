@@ -6,11 +6,30 @@ import pathlib
 import sys
 
 
-def update_or_equal(dict_, key, value):
+def update_or_equal(dict_, key, new_value):
     if key in dict_:
-        assert dict_[key] == value
+        old_value = dict_[key]
+        if old_value == new_value:
+            return
+        old_without_mtime = dict(old_value)
+        del old_without_mtime["mtime"]
+        new_without_mtime = dict(new_value)
+        del new_without_mtime["mtime"]
+        if old_without_mtime != new_without_mtime:
+            print(f"ERROR: CONFLICT for key {key}:\n{old_value}\n{new_value}")
+            raise AssertionError
+        # At this point, the conflict is only about mtime. This is actually quite common, so we want to report it only once, each.
+        if old_value["mtime"] is None:
+            # Already reported, nothing to do.
+            return
+        print(
+            f"Warning: Conflicting mtime for {key} (e.g. {old_value['mtime']} vs. {new_value['mtime']})",
+            file=sys.stderr,
+        )
+        old_value['mtime'] = None
+        # No need to update dict_, since it still contains old_value by reference.
     else:
-        dict_[key] = value
+        dict_[key] = new_value
 
 
 def do_merge(sources):
@@ -28,25 +47,31 @@ def do_merge(sources):
             name = file_expectation["name"]
             path = pathlib.Path(name)
             update_or_equal(path_to_filedict, path.as_posix(), file_expectation)
-            path_to_all_children[path.parent.as_posix()].add(path.name)
+            if name != ".":
+                path_to_all_children[path.parent.as_posix()].add(path.name)
 
-    # Step 2: Emit deduplicated data
+    # Step 2: Generate new expectations
+    # Specifically, we now expect that each directory *only* contains the mentioned files.
+    for parent, children in path_to_all_children.items():
+        assert parent in path_to_filedict
+        parent_entry = path_to_filedict[parent]
+        assert parent_entry["filetype"] == "dir"
+        assert parent_entry["children"] == None
+        children_list = list(children)
+        children_list.sort()
+        parent_entry["children"] = children_list
+
+    # Sanity check that we caught all dirs
+    for entry in path_to_filedict.values():
+        if entry["filetype"] != "dir":
+            continue
+        if "children" not in entry:
+            print(f"Not checking children of {entry.name}", file=sys.stderr)
+
+    # Step 3: Emit deduplicated, rearranged data
     expectations = list(path_to_filedict.values())
     del path_to_filedict  # Early gc, just in case it helps
     expectations.sort(key=lambda e: e["name"])
-
-    # Step 3: Emit the new expectations
-    # Specifically, we now expect that each directory *only* contains the mentioned files.
-    for parent, children in path_to_all_children.items():
-        children_list = list(children)
-        children_list.sort()
-        expectations.append(
-            {
-                "type": "listdir",
-                "name": "./" + parent,  # Damn you, pathlib!
-                "children": children_list,
-            }
-        )
 
     return expectations
 
