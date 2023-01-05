@@ -48,11 +48,11 @@ def extract_info(debfile_object):
             assert info_content_fp is not None, info_member
             member_sha256 = hashlib.file_digest(info_content_fp, "sha256").hexdigest()
         else:
-            member_sha256 = ""
+            member_sha256 = None
         if info_member.isdev():
             dev_inode = (info_member.devmajor, info_member.devminor)
         else:
-            dev_inode = (-1, -1)
+            dev_inode = None
         new_expectation = {
             "type": "file",
             "filetype": tarinfo_type_to_string(info_member),
@@ -60,16 +60,21 @@ def extract_info(debfile_object):
             "size": info_member.size,
             "mtime": info_member.mtime,
             "mode": info_member.mode,
-            "linkname": info_member.linkname,  # Both symlinks and hardlinks!
+            "linkname": info_member.linkname if info_member.linkname else None,  # Both symlinks and hardlinks!
             "uid": info_member.uid,
             "gid": info_member.gid,
-            "uname": info_member.uname,
-            "gname": info_member.gname,
+            # "uname": info_member.uname,  # Can't really use it, changes from system to system anyway.
+            # "gname": info_member.gname,  # Can't really use it, changes from system to system anyway.
             "pax_headers": info_member.pax_headers,
             "sha256": member_sha256,
             "dev_inode": dev_inode,
             "children": None,
         }
+        if info_member.pax_headers:
+            print(
+                f"Warning: Non-empty PAX-headers for file {info_member.name}: {info_member.pax_headers}",
+                file=sys.stderr,
+            )
         expectations.append(new_expectation)
 
     return expectations
