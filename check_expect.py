@@ -1,6 +1,7 @@
 #!/usr/bin/env python3.11
 
 from debian import debfile
+import argparse
 import hashlib
 import json
 import os
@@ -88,9 +89,9 @@ def fetch_actual_xattr_dict(filename):
     return dict(xattr.xattr(filename, xattr.XATTR_NOFOLLOW))
 
 
-def check_expectation(destdir, expectation):
+def check_expectation(args, expectation):
     assert expectation["type"] == "file", f"Can't handle type {expectation['type']}"
-    effective_path = destdir + expectation["name"]
+    effective_path = args.destdir + expectation["name"]
     report = dict(name=expectation["name"])
     # TODO: if stat.st_nlink > 1, cache it somehow for easier hardlink checks
     has_any_conflict = False
@@ -179,7 +180,7 @@ def check_expectation(destdir, expectation):
                 report["symlink"] = "Uncheckable; actual is not a symlink"
                 assert has_any_conflict
         elif expectation["filetype"] == "lnk":
-            stat_other = os.stat(destdir + expectation["linkname"])
+            stat_other = os.stat(args.destdir + expectation["linkname"])
             this_ident = (stat_result.st_dev, stat_result.st_ino)
             other_ident = (stat_other.st_dev, stat_other.st_ino)
             if this_ident != other_ident:
@@ -202,31 +203,39 @@ def check_expectation(destdir, expectation):
     return None
 
 
-def run_expectations(destdir_path, expectations):
-    if not destdir_path.endswith("/"):
-        destdir_path += "/"
+def run_expectations(args, expectations):
+    if not args.destdir.endswith("/"):
+        args.destdir += "/"
     reports = []
     for expectation in expectations:
-        report = check_expectation(destdir_path, expectation)
+        report = check_expectation(args, expectation)
         if report is not None:
             reports.append(report)
             print(report)
     return reports
 
 
-def run(destdir_path, fsexpect_filename):
-    with open(fsexpect_filename, "r") as fp:
+def run(args):
+    with open(args.json_filename, "r") as fp:
         expectations = json.load(fp)
-    _reports = run_expectations(destdir_path, expectations)
+    _reports = run_expectations(args, expectations)
     # TODO: Do something more reasonable with the reports?
 
 
+def build_parser():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "json_filename",
+        metavar="total_or_deb.json",
+    )
+    parser.add_argument(
+        "--destdir",
+        default="/",
+        help="Root of the filesystem under test. (default: '/')",
+    )
+    return parser
+
+
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
-        print(
-            f"USAGE: {sys.argv[0]} /path/to/destdir/ YOUR.total_OR_deb.json",
-            file=sys.stderr,
-        )
-        exit(1)
-    else:
-        run(sys.argv[1], sys.argv[2])
+    args = build_parser().parse_args()
+    run(args)

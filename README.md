@@ -33,9 +33,8 @@ Installing `python3-xattr` is optional, but without it the extended attributes o
    `parallel -j15 -i ./deb2fsexpect.py '{}' '{}.json' -- /tmp/expected_debs/*.deb`
 3. OPTIONAL: If you have multiple `.deb`s *AND* you want a report of all the unexpected/new files, use `./merge_expectations.py RESULT.total.json TWO_OR_MORE_SOURCES.deb.json` to merge the JSON files from the previous step. Using the above running example, this would be:
    `./merge_expectations.py /tmp/expected_debs/total.json /tmp/expected_debs/*.deb.json`
-4. Check that a given root directory satisfies all expectations: `./check_expect.py /path/to/destdir/ FOO.json`
-   If you want to check the expectations against the currently-running system, just pass `/` as the first argument.
-   Yes, I'm very aware that `./check_expect.py / FOO.json` looks wrong. Feel free to implement something nicer with argsparser, because I won't.
+4. Check that the currently running system satisfies all expectations: `./check_expect.py FOO.json`
+   If you want to check the expectations against a mounted system, just pass `--destdir /path/to/mnt-or-destdir/` as the first argument.
 
 Note that this may take up a lot of memory, so you may want to run this in a `ulimit -m` shell, if you're worried about OOM. For reference, the JSON files generated in step 2 are in total 136 MiB on my system.
 
