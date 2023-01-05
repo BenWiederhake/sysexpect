@@ -98,10 +98,10 @@ def check_expectation(args, expectation):
     try:
         stat_result = os.stat(effective_path, follow_symlinks=False)
     except FileNotFoundError:
-        report["error"] = "FileNotFoundError"
+        report["error_stat"] = "FileNotFoundError"
         return report
     except PermissionError:
-        report["error"] = "PermissionError during stat (try running as root)"
+        report["error_stat"] = "PermissionError during stat (try running as root)"
         return report
     actual_filetype, actual_mode = simplify_mode(stat_result.st_mode)
     expected_filetype = expectation["filetype"]
@@ -133,7 +133,7 @@ def check_expectation(args, expectation):
             with open(effective_path, "rb") as fp:
                 actual_sha256 = hashlib.file_digest(fp, "sha256").hexdigest()
         except PermissionError:
-            report["error"] = "PermissionError during read (try running as root)"
+            report["error_read"] = "PermissionError during read (try running as root)"
             has_any_conflict = True
             actual_sha256 = None
         if actual_sha256 is not None:
@@ -145,7 +145,7 @@ def check_expectation(args, expectation):
             actual_children = os.listdir(effective_path)
         except PermissionError:
             actual_children = []
-            report["error"] = "PermissionError during listdir (try running as root)"
+            report["error_listdir"] = "PermissionError during listdir (try running as root)"
             has_any_conflict = True
         # Any missing children will be reported through their respective expectation entry.
         # Therefore, only report extraneous children here:
@@ -180,22 +180,32 @@ def check_expectation(args, expectation):
                 report["symlink"] = "Uncheckable; actual is not a symlink"
                 assert has_any_conflict
         elif expectation["filetype"] == "lnk":
-            stat_other = os.stat(args.destdir + expectation["linkname"])
-            this_ident = (stat_result.st_dev, stat_result.st_ino)
-            other_ident = (stat_other.st_dev, stat_other.st_ino)
-            if this_ident != other_ident:
+            try:
+                stat_other = os.stat(args.destdir + expectation["linkname"], follow_symlinks=False)
+            except:
                 has_any_conflict = True
-                report["hardlink"] = {"this_file": this_ident, "expected": other_ident}
+                report["error_stat_link_dest"] = "PermissionError during stat (try running as root)"
+            else:
+                this_ident = (stat_result.st_dev, stat_result.st_ino)
+                other_ident = (stat_other.st_dev, stat_other.st_ino)
+                if this_ident != other_ident:
+                    has_any_conflict = True
+                    report["hardlink"] = {"this_file": this_ident, "expected": other_ident}
         else:
             raise AssertionError(
                 f"non-linking filetype {expectation['filetype']} tries to link to {expectation['linkname']}?!"
             )
     if CAN_CHECK_XATTR:
-        actual_xattr = fetch_actual_xattr_dict(effective_path)
-        expected_xattr = expectation["pax_headers"]
-        has_any_conflict |= check_for_conflict(
-            report, "xattr", actual_xattr, expected_xattr
-        )
+        try:
+            actual_xattr = fetch_actual_xattr_dict(effective_path)
+        except PermissionError:
+            has_any_conflict = True
+            report["error_xattr"] = "PermissionError during xattr (try running as root)"
+        else:
+            expected_xattr = expectation["pax_headers"]
+            has_any_conflict |= check_for_conflict(
+                report, "xattr", actual_xattr, expected_xattr
+            )
 
     if has_any_conflict:
         return report
