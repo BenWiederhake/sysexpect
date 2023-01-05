@@ -151,6 +151,8 @@ def check_expectation(args, expectation):
         # Therefore, only report extraneous children here:
         actual_children = set(actual_children)
         actual_children.difference_update(expectation["children"])
+        if args.ignore_pycache:
+            actual_children.discard("__pycache__")
         extraneous_children = list(actual_children)
         extraneous_children.sort()
         if extraneous_children:
@@ -247,6 +249,11 @@ def build_parser():
         "--ignore-mtime",
         action="store_true",
         help="Ignore mtime deviations. (default: don't ignore)",
+    )
+    parser.add_argument(
+        "--ignore-pycache",
+        action="store_true",
+        help="Ignore extraneous child '__pycache__'. (default: don't ignore)",
     )
     return parser
 
