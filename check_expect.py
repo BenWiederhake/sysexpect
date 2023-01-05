@@ -80,15 +80,7 @@ def check_for_conflict(report, key, actual, expected):
     if actual == expected or expected is None:
         # All is well!
         return False
-    if isinstance(actual, list):
-        report[key] = {
-            "expected_10": expected[:10],
-            "expected_len": len(expected),
-            "actual_10": actual[:10],
-            "actual_len": len(actual),
-        }
-    else:
-        report[key] = {"expected": expected, "actual": actual}
+    report[key] = {"expected": expected, "actual": actual}
     return True
 
 
@@ -147,17 +139,22 @@ def check_expectation(destdir, expectation):
             has_any_conflict |= check_for_conflict(
                 report, "sha256", actual_sha256, expectation["sha256"]
             )
-    if actual_filetype == "dir" and expectation["filetype"] == "dir":
+    if actual_filetype == "dir" and expectation["filetype"] == "dir" and expectation["children"] is not None:
         try:
             actual_children = os.listdir(effective_path)
         except PermissionError:
             actual_children = []
             report["error"] = "PermissionError during listdir (try running as root)"
             has_any_conflict = True
-        actual_children.sort()
-        has_any_conflict |= check_for_conflict(
-            report, "children", actual_children, expectation["children"]
-        )
+        # Any missing children will be reported through their respective expectation entry.
+        # Therefore, only report extraneous children here:
+        actual_children = set(actual_children)
+        actual_children.difference_update(expectation["children"])
+        extraneous_children = list(actual_children)
+        extraneous_children.sort()
+        if extraneous_children:
+            has_any_conflict = True
+            report['extraneous_children'] = extraneous_children
     if expectation["dev_inode"] is not None:
         actual_dev_inode = (os.major(stat_result.st_dev), os.minor(stat_result.st_dev))
         has_any_conflict |= check_for_conflict(
