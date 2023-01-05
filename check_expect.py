@@ -93,7 +93,7 @@ def check_for_conflict(report, key, actual, expected):
 
 
 def fetch_actual_xattr_dict(filename):
-    return dict(xattr.xattr(filename))
+    return dict(xattr.xattr(filename, xattr.XATTR_NOFOLLOW))
 
 
 def check_expectation(destdir, expectation):
