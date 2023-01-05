@@ -10,18 +10,18 @@ def update_or_equal(dict_, key, new_value):
     if key in dict_:
         old_value = dict_[key]
         if old_value == new_value:
-            return
+            return 0
         old_without_mtime = dict(old_value)
         del old_without_mtime["mtime"]
         new_without_mtime = dict(new_value)
         del new_without_mtime["mtime"]
         if old_without_mtime != new_without_mtime:
             print(f"ERROR: CONFLICT for key {key}:\n{old_value}\n{new_value}")
-            raise AssertionError
+            return 1
         # At this point, the conflict is only about mtime. This is actually quite common, so we want to report it only once, each.
         if old_value["mtime"] is None:
             # Already reported, nothing to do.
-            return
+            return 0
         print(
             f"Warning: Conflicting mtime for {key} (e.g. {old_value['mtime']} vs. {new_value['mtime']})",
             file=sys.stderr,
@@ -30,6 +30,7 @@ def update_or_equal(dict_, key, new_value):
         # No need to update dict_, since it still contains old_value by reference.
     else:
         dict_[key] = new_value
+    return 0
 
 
 def do_merge(sources):
@@ -38,6 +39,7 @@ def do_merge(sources):
     path_to_all_children = defaultdict(set)
     # TODO: Stream instead of doing multi-pass.
     # Also, memory-efficiency in general.
+    errors = 0
     for source_index, source in enumerate(sources):
         for file_expectation in source:
             # Wtf, black?!
@@ -46,9 +48,12 @@ def do_merge(sources):
             ), f"Entry in source #{i} (0-indexed) does not have type=file. Maybe target and sources mixed up?"
             name = file_expectation["name"]
             path = pathlib.Path(name)
-            update_or_equal(path_to_filedict, path.as_posix(), file_expectation)
+            errors += update_or_equal(path_to_filedict, path.as_posix(), file_expectation)
             if name != ".":
                 path_to_all_children[path.parent.as_posix()].add(path.name)
+    if errors:
+        print(f"Encountered {errors} errors, aborting.")
+        exit(1)
 
     # Step 2: Generate new expectations
     # Specifically, we now expect that each directory *only* contains the mentioned files.
