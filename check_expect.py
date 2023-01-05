@@ -107,6 +107,9 @@ def check_expectation(destdir, expectation):
     except FileNotFoundError:
         report["error"] = "FileNotFoundError"
         return report
+    except PermissionError:
+        report["error"] = "PermissionError during stat (try running as root)"
+        return report
     actual_filetype, actual_mode = simplify_mode(stat_result.st_mode)
     expected_filetype = expectation["filetype"]
     if expected_filetype == "lnk":
@@ -133,19 +136,28 @@ def check_expectation(destdir, expectation):
             report, "size", stat_result.st_size, expectation["size"]
         )
     if actual_filetype == "reg":
-        with open(effective_path, "rb") as fp:
-            actual_sha256 = hashlib.file_digest(fp, "sha256").hexdigest()
-        has_any_conflict |= check_for_conflict(
-            report, "sha256", actual_sha256, expectation["sha256"]
-        )
-    if actual_filetype == "dir" and expectation["children"] is not None:
-        actual_children = os.listdir(effective_path)
+        try:
+            with open(effective_path, "rb") as fp:
+                actual_sha256 = hashlib.file_digest(fp, "sha256").hexdigest()
+        except PermissionError:
+            report["error"] = "PermissionError during read (try running as root)"
+            has_any_conflict = True
+            actual_sha256 = None
+        if actual_sha256 is not None:
+            has_any_conflict |= check_for_conflict(
+                report, "sha256", actual_sha256, expectation["sha256"]
+            )
+    if actual_filetype == "dir" and expectation["filetype"] == "dir":
+        try:
+            actual_children = os.listdir(effective_path)
+        except PermissionError:
+            actual_children = []
+            report["error"] = "PermissionError during listdir (try running as root)"
+            has_any_conflict = True
         actual_children.sort()
         has_any_conflict |= check_for_conflict(
             report, "children", actual_children, expectation["children"]
         )
-    else:
-        assert expectation["children"] is None
     if expectation["dev_inode"] is not None:
         actual_dev_inode = (os.major(stat_result.st_dev), os.minor(stat_result.st_dev))
         has_any_conflict |= check_for_conflict(
