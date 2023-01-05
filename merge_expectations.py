@@ -51,9 +51,6 @@ def do_merge(sources):
             errors += update_or_equal(path_to_filedict, path.as_posix(), file_expectation)
             if name != ".":
                 path_to_all_children[path.parent.as_posix()].add(path.name)
-    if errors:
-        print(f"Encountered {errors} errors, aborting.")
-        exit(1)
 
     # Step 2: Generate new expectations
     # Specifically, we now expect that each directory *only* contains the mentioned files.
@@ -78,7 +75,7 @@ def do_merge(sources):
     del path_to_filedict  # Early gc, just in case it helps
     expectations.sort(key=lambda e: e["name"])
 
-    return expectations
+    return expectations, errors
 
 
 def run(result_filename, source_filenames):
@@ -86,9 +83,12 @@ def run(result_filename, source_filenames):
     for source_filename in source_filenames:
         with open(source_filename, "r") as fp:
             sources.append(json.load(fp))
-    result = do_merge(sources)
+    result, errors = do_merge(sources)
     with open(result_filename, "w") as fp:
         json.dump(result, fp)
+    if errors:
+        print(f"Encountered {errors} errors. Output file is usable, but will cause false positives.")
+        exit(1)
 
 
 if __name__ == "__main__":

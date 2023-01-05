@@ -44,3 +44,42 @@ Note that this may take up a lot of memory, so you may want to run this in a `ul
 - We currently mis-detect generated files and other things that would be handled by `{pre,post}rm` scripts.
 - In fact, we ignore all 'preinst', 'postinst', 'prerm', 'postrm', and 'config' scripts. At least a warning is generated saying so.
 - `check_expect.py` can probably be sped up significantly by doing something in parallel.
+
+## Further Notes
+
+### Duplicate files
+
+Sadly, some deb packages contain the same file at the same path. This wastes some disk space and bandwidth during updates, but it's no cause of worry.
+
+### Duplicate files with different mtimes
+
+```
+Warning: Conflicting mtime for usr/share/doc/libexif12/changelog.Debian.gz (e.g. 1663552334 vs. 1663571684)
+Warning: Conflicting mtime for usr/share/locale/be/LC_MESSAGES/libexif-12.mo (e.g. 1663552334 vs. 1663571684)
+Warning: Conflicting mtime for etc/pulse/client.conf (e.g. 1665905116 vs. 1665891704)
+```
+
+This is probably a symptom of non-reproducibility: I guess that the mtime in the .deb package is just the time at which the package was built, instead of being derived only from the package source.
+
+It's not a cause of worry, and handled gracefully here: While merging, any such case results in the `mtime` field being set to `null`, indicating that there is no expectation regarding the mtime of the system file.
+
+### Duplicate files with different contents
+
+```
+ERROR: CONFLICT for key usr/bin/pg_config:
+{'type': 'file', 'filetype': 'reg', 'name': './usr/bin/pg_config', 'size': 6393, 'mtime': 1667901552, 'mode': 493, 'linkname': None, 'uid': 0, 'gid': 0, 'pax_headers': {}, 'sha256': '19fffe64afa5a626f3e5a257cfa9c9ec8fa3f272295c74e2cfce460557dac830', 'dev_inode': None, 'children': None}
+{'type': 'file', 'filetype': 'reg', 'name': './usr/bin/pg_config', 'size': 1229, 'mtime': 1597408163, 'mode': 493, 'linkname': None, 'uid': 0, 'gid': 0, 'pax_headers': {}, 'sha256': '56e697a2dd537bcaf15258f5aa10fa39b4506e7a9866fd466731ba21d0d2a2f7', 'dev_inode': None, 'children': None}
+```
+
+This means that more than one package attempts to install a file at that path, and those files are not identical. In this case, it tries to make `/usr/bin/pg_config` a 1229 byte shell script *and* a 6393 byte perl script.
+
+As far as I can see, this happens at least for the following files:
+
+```
+/lib/ld-linux.so.2: libc6:i386, libc6-i386
+/usr/bin/pg_config: postgresql-common, libpq-dev
+```
+
+The main reason for this "conflict" is that we don't parse dpkg-divert calls yet.
+Why are these dynamic? This should be part of the control data!
+Anyway, parsing these is doomed to fail. You can inspect the list of active diversions on your system: `cat /var/lib/dpkg/diversions`

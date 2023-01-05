@@ -37,6 +37,10 @@ def extract_info(debfile_object):
     expectations = []
     controlfile = debfile_object.control
     # TODO: Do something with controlfile.scripts?
+    # TODO: Parse scripts for calls to dpkg-divert
+    # TODO: Parse scripts for calls to update-alternatives
+    # Note that sometimes these are hidden in other scripts from other packages. Aaaah!
+    # TODO: Parse 'conffiles' and mark them as dontcare for sha256/mtime/size.
     scripts = controlfile.scripts()
     if scripts:
         print(f"ignoring {len(scripts)} scripts: {scripts.keys()}")
