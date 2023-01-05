@@ -77,7 +77,7 @@ def simplify_mode(stat_mode):
 
 
 def check_for_conflict(report, key, actual, expected):
-    if actual == expected:
+    if actual == expected or expected is None:
         # All is well!
         return False
     if isinstance(actual, list):
