@@ -161,7 +161,7 @@ def check_expectation(args, expectation):
         has_any_conflict |= check_for_conflict(
             report, "dev_inode", actual_dev_inode, expectation["dev_inode"]
         )
-    if expectation["mtime"] is not None and actual_filetype != "dir":
+    if expectation["mtime"] is not None and actual_filetype != "dir" and not args.ignore_mtime:
         mtime_diff = abs(expectation["mtime"] - stat_result.st_mtime)
         if mtime_diff > MAX_MTIME_DIFF:
             has_any_conflict = True
@@ -242,6 +242,11 @@ def build_parser():
         "--destdir",
         default="/",
         help="Root of the filesystem under test. (default: '/')",
+    )
+    parser.add_argument(
+        "--ignore-mtime",
+        action="store_true",
+        help="Ignore mtime deviations. (default: don't ignore)",
     )
     return parser
 
