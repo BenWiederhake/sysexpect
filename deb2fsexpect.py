@@ -58,7 +58,8 @@ def extract_info(debfile_object):
             "filetype": tarinfo_type_to_string(info_member),
             "name": info_member.name,
             "size": info_member.size,
-            "mtime": info_member.mtime,
+            # The mtime of directories has no real weight, discard it:
+            "mtime": None if info_member.isdir() else info_member.mtime,
             "mode": info_member.mode,
             "linkname": info_member.linkname if info_member.linkname else None,  # Both symlinks and hardlinks!
             "uid": info_member.uid,
