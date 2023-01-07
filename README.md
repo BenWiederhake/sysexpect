@@ -40,6 +40,20 @@ Installing `python3-xattr` is optional, but without it the extended attributes o
 
 Note that this may take up a lot of memory, so you may want to run this in a `ulimit -m` shell, if you're worried about OOM. For reference, the JSON files generated in step 2 are in total 136 MiB on my system.
 
+To get a rough overview over the types of findings, you can do this:
+```
+$ cat output_from_check_expect.txt | jq 'keys | .[]' | sort | uniq -c | sort -n
+      1 "linkname"
+      3 "xattr_base64"
+     12 "uid"
+     25 "gid"
+     28 "sha256"
+     28 "size"
+     41 "mode"
+    289 "extraneous_children"
+    361 "name"
+```
+
 ## TODO
 
 - We currently mis-detect generated files and other things that would be handled by `{pre,post}rm` scripts.
