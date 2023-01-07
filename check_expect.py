@@ -2,6 +2,7 @@
 
 from debian import debfile
 import argparse
+import base64
 import hashlib
 import json
 import os
@@ -209,9 +210,11 @@ def check_expectation(args, expectation):
             has_any_conflict = True
             report["error_xattr"] = "PermissionError during xattr (try running as root)"
         else:
+            # `.decode()` "decodes" a string of bytes that is guaranteed to be ASCII (in fact, from the base64-alphabet) to python strings.
+            base64_xattr = {k: base64.b64encode(v).decode() for k, v in actual_xattr.items()}
             expected_xattr = expectation["pax_headers"]
             has_any_conflict |= check_for_conflict(
-                report, "xattr", actual_xattr, expected_xattr
+                report, "xattr_base64", base64_xattr, expected_xattr
             )
 
     if has_any_conflict:
@@ -228,7 +231,7 @@ def run_expectations(args, expectations):
         report = check_expectation(args, expectation)
         if report is not None:
             reports.append(report)
-            print(report)
+            print(json.dumps(report))
     return reports
 
 
