@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from collections import defaultdict
+import argparse
 import json
 import pathlib
 import sys
@@ -78,25 +79,36 @@ def do_merge(sources):
     return expectations, errors
 
 
-def run(result_filename, source_filenames):
+def run(args):
     sources = []
-    for source_filename in source_filenames:
+    for source_filename in args.source_filenames:
         with open(source_filename, "r") as fp:
             sources.append(json.load(fp))
     result, errors = do_merge(sources)
-    with open(result_filename, "w") as fp:
+    with open(args.result_filename, "w") as fp:
         json.dump(result, fp)
     if errors:
         print(f"Encountered {errors} errors. Output file is usable, but will cause false positives.")
         exit(1)
 
 
+def build_parser():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "result_filename",
+        metavar="RESULT.total.json",
+    )
+    parser.add_argument(
+        "source_filenames",
+        metavar="TWO_OR_MORE_SOURCES.deb.json",
+        nargs="+"
+    )
+    return parser
+
+
 if __name__ == "__main__":
-    if len(sys.argv) < 4:
-        print(
-            f"USAGE: {sys.argv[0]} RESULT.total.json TWO_OR_MORE_SOURCES.deb.json",
-            file=sys.stderr,
-        )
+    args = build_parser().parse_args()
+    if len(args.source_filenames) == 1:
+        print(f"Only one source file given. This does not usually make sense, aborting.", file=sys.stderr)
         exit(1)
-    else:
-        run(sys.argv[1], sys.argv[2:])
+    run(args)
