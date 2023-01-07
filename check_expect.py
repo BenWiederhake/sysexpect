@@ -140,7 +140,12 @@ def check_expectation(args, expectation):
             has_any_conflict |= check_for_conflict(
                 report, "sha256", actual_sha256, expectation["sha256"]
             )
-    if actual_filetype == "dir" and expectation["filetype"] == "dir" and expectation["children"] is not None:
+    should_check_children = actual_filetype == "dir" and expectation["filetype"] == "dir"
+    should_check_children &= expectation["children"] is not None
+    should_check_children &= expectation["name"][1:] not in args.ignore_children_of_dir
+    should_check_children &= effective_path not in args.ignore_children_of_dir
+    # TODO: Report unused entries in "ignore_children_of_dir".
+    if should_check_children:
         try:
             actual_children = os.listdir(effective_path)
         except PermissionError:
@@ -254,6 +259,16 @@ def build_parser():
         "--ignore-pycache",
         action="store_true",
         help="Ignore extraneous child '__pycache__'. (default: don't ignore)",
+    )
+    parser.add_argument(
+        "--ignore-children-of-dir",
+        action="append",
+        help="Ignore any extraneous children of given directory. Can be specified multiple times. Example:\n\
+                --ignore-children-of-dir ./var/cache/apt/archives\n\
+                --ignore-children-of-dir ./var/lib/apt/lists\n\
+                --ignore-children-of-dir ./var/log\n\
+              (default: empty list)",
+        default=[],
     )
     return parser
 

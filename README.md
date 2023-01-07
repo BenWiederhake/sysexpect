@@ -35,6 +35,8 @@ Installing `python3-xattr` is optional, but without it the extended attributes o
    `./merge_expectations.py /tmp/expected_debs/total.json /tmp/expected_debs/*.deb.json`
 4. Check that the currently running system satisfies all expectations: `./check_expect.py FOO.json`
    If you want to check the expectations against a mounted system, just pass `--destdir /path/to/mnt-or-destdir/` as the first argument.
+   Here's how an invocation can look like:
+   `sudo ./check_expect.py --ignore-mtime --ignore-pycache --ignore-children-of-dir /var/cache/apt/archives --ignore-children-of-dir /var/lib/apt/lists --ignore-children-of-dir /var/log /tmp/expected_debs/total.json`
 
 Note that this may take up a lot of memory, so you may want to run this in a `ulimit -m` shell, if you're worried about OOM. For reference, the JSON files generated in step 2 are in total 136 MiB on my system.
 
