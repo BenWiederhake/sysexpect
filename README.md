@@ -28,9 +28,9 @@ Installing `python3-xattr` is optional, but without it the extended attributes o
    Also note that the output of `apt list` is unstable.
 2. Convert each `.deb` to a list of expectations: `./deb2fsexpect.py FOO.deb FOO.deb.json`
    If your `.deb`s are in `/tmp/expected_debs/`, you could use:
-   `for deb in /tmp/expected_debs/*.deb; do echo "Processing $deb ..."; ./deb2fsexpect.py $deb $deb.json; done`
+   `for deb in /tmp/expected_debs/*.deb; do echo "Processing $deb ..."; ./deb2fsexpect.py --expect-run-merged --expect-usr-merged $deb $deb.json; done`
    Alternatively, you could also do this in parallel:
-   `parallel -j15 -i ./deb2fsexpect.py --expect-usr-merged '{}' '{}.json' -- /tmp/expected_debs/*.deb`
+   `parallel -j15 -i ./deb2fsexpect.py --expect-run-merged --expect-usr-merged '{}' '{}.json' -- /tmp/expected_debs/*.deb`
 3. OPTIONAL: If you have multiple `.deb`s *AND* you want a report of all the unexpected/new files, use `./merge_expectations.py RESULT.total.json TWO_OR_MORE_SOURCES.deb.json` to merge the JSON files from the previous step. Using the above running example, this would be:
    `./merge_expectations.py /tmp/expected_debs/total.json /tmp/expected_debs/*.deb.json`
 4. Check that the currently running system satisfies all expectations: `./check_expect.py FOO.json`

@@ -122,6 +122,16 @@ def extract_info(debfile_object, args):
             "dev_inode": dev_inode,
             "children": None,
         }
+        if args.expect_run_merged and actual_name in ["./var/lock", "./var/run"]:
+            # The destination is in fact also part of the base-files package, so we must not create a new entry for that.
+            new_expectation["filetype"] = "sym"
+            if actual_name == "./var/lock":
+                new_expectation["linkname"] = "/run/lock"
+            elif actual_name == "./var/run":
+                new_expectation["linkname"] = "/run"
+            else:
+                raise AssertionError(actual_name)
+            new_expectation["mode"] = 0o777
         if info_member.pax_headers:
             print(
                 f"Warning: Non-empty PAX-headers for file {info_member.name}: {info_member.pax_headers}",
@@ -148,6 +158,11 @@ def build_parser():
     parser.add_argument(
         "json_filename",
         metavar="other/path/to/output.json",
+    )
+    parser.add_argument(
+        "--expect-run-merged",
+        action="store_true",
+        help="Assume that /var/run and /var/lock are symlinks to /run and /run/lock (default: false)",
     )
     parser.add_argument(
         "--expect-usr-merged",
