@@ -104,11 +104,12 @@ def extract_info(debfile_object, args):
                 "children": None,
             }
             expectations.append(injected_expectation)
+        filetype = tarinfo_type_to_string(info_member)
         new_expectation = {
             "type": "file",
-            "filetype": tarinfo_type_to_string(info_member),
+            "filetype": filetype,
             "name": actual_name,
-            "size": info_member.size,
+            "size": None if filetype == "lnk" else info_member.size,
             # The mtime of directories has no real weight, discard it:
             "mtime": None if info_member.isdir() else info_member.mtime,
             "mode": info_member.mode,
