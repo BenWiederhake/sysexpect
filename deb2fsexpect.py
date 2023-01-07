@@ -1,6 +1,7 @@
 #!/usr/bin/env python3.11
 
 from debian import debfile
+import argparse
 import hashlib
 import json
 import sys
@@ -85,19 +86,26 @@ def extract_info(debfile_object):
     return expectations
 
 
-def run(deb_filename, json_filename):
-    debfile_object = debfile.DebFile(deb_filename)
+def run(args):
+    debfile_object = debfile.DebFile(args.deb_filename)
     expectations = extract_info(debfile_object)
-    with open(json_filename, "w") as fp:
+    with open(args.json_filename, "w") as fp:
         json.dump(expectations, fp)
 
 
+def build_parser():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "deb_filename",
+        metavar="some/path/to/package.deb",
+    )
+    parser.add_argument(
+        "json_filename",
+        metavar="other/path/to/output.json",
+    )
+    return parser
+
+
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
-        print(
-            f"USAGE: {sys.argv[0]} some/path/to/package.deb other/path/to/output.json",
-            file=sys.stderr,
-        )
-        exit(1)
-    else:
-        run(sys.argv[1], sys.argv[2])
+    args = build_parser().parse_args()
+    run(args)
