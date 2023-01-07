@@ -16,6 +16,16 @@ if getattr(hashlib, "file_digest", None) is None:
     exit(2)
 
 
+USR_MERGE_ROOT_DIRS = [
+    "bin",
+    "lib",
+    "lib32",
+    "lib64",
+    "libx32",
+    "sbin",
+]
+
+
 def tarinfo_type_to_string(info):
     if info.isreg():
         return "reg"
@@ -34,7 +44,23 @@ def tarinfo_type_to_string(info):
     raise AssertionError(info.name, info.type)
 
 
-def extract_info(debfile_object):
+def resolve_name(name_in_tar, args):
+    """
+    Returns a tuple of two values:
+    - The actual name under which the file will be expected.
+    - Whether a symlink should be expected from the old location to the new one.
+    """
+    if args.expect_usr_merged:
+        for usr_root_dir in USR_MERGE_ROOT_DIRS:
+            compound_usr_root_dir = "./" + usr_root_dir
+            if not name_in_tar.startswith(compound_usr_root_dir):
+                continue
+            new_name = "./usr" + name_in_tar[1:]  # Slice off the initial "."
+            return new_name, name_in_tar == compound_usr_root_dir
+    return name_in_tar, False
+
+
+def extract_info(debfile_object, args):
     expectations = []
     controlfile = debfile_object.control
     # TODO: Do something with controlfile.scripts?
@@ -58,10 +84,30 @@ def extract_info(debfile_object):
             dev_inode = (info_member.devmajor, info_member.devminor)
         else:
             dev_inode = None
+        actual_name, inject_symlink = resolve_name(info_member.name, args)
+        if inject_symlink:
+            assert actual_name.startswith("./")
+            injected_expectation = {
+                "type": "file",
+                "filetype": "sym",
+                "name": info_member.name,
+                "size": None,
+                # Depends on when the system was converted, which has no real bearing:
+                "mtime": None,
+                "mode": 0o777,
+                "linkname": actual_name[2:],  # Slice off initial "./"
+                "uid": 0,  # root
+                "gid": 0,  # root
+                "pax_headers": dict(),
+                "sha256": None,
+                "dev_inode": None,
+                "children": None,
+            }
+            expectations.append(injected_expectation)
         new_expectation = {
             "type": "file",
             "filetype": tarinfo_type_to_string(info_member),
-            "name": info_member.name,
+            "name": actual_name,
             "size": info_member.size,
             # The mtime of directories has no real weight, discard it:
             "mtime": None if info_member.isdir() else info_member.mtime,
@@ -88,7 +134,7 @@ def extract_info(debfile_object):
 
 def run(args):
     debfile_object = debfile.DebFile(args.deb_filename)
-    expectations = extract_info(debfile_object)
+    expectations = extract_info(debfile_object, args)
     with open(args.json_filename, "w") as fp:
         json.dump(expectations, fp)
 
@@ -102,6 +148,11 @@ def build_parser():
     parser.add_argument(
         "json_filename",
         metavar="other/path/to/output.json",
+    )
+    parser.add_argument(
+        "--expect-usr-merged",
+        action="store_true",
+        help="Assume that bin,lib{,32,64,x32},sbin are symlinks into usr/... (default: false)",
     )
     return parser
 
