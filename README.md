@@ -59,6 +59,13 @@ $ cat output_from_check_expect.txt | jq 'keys | .[]' | sort | uniq -c | sort -n
 - We currently mis-detect generated files and other things that would be handled by `{pre,post}rm` scripts.
 - In fact, we ignore all 'preinst', 'postinst', 'prerm', 'postrm', and 'config' scripts. At least a warning is generated saying so.
 - `check_expect.py` can probably be sped up significantly by doing something in parallel.
+- Parse preinst/postinst scripts to detect calls to dpkg-divert and update-alternatives. This is doomed to fail, since shell scripts are by design Turing complete.
+- `/var/lib/dpkg/info/`: This directory contains all control files of all installed or configured packages, I think. Therefore, `deb2fsexpect.py` could issue expectations
+- `deb2fsexpect.py` does not really read the control tar, therefore it also ignores the list of `conffiles`, and raises warnings if the installed file is different than the package maintainer's version.
+- uid/gid/mode: It seems that the preinst/postinst/etc scripts may also change the owner of a file, which is reasonable, as a static tarfile cannot possibly know the numeric ID of system groups of the target system. However, this means that these things are set dynamically as part of scripts, which again raises the issue of parsing shell scripts. The same happens with permissions, although I don't really understand why this is necessary in the first place.
+- The shell scripts are also where extended attributes are set. On my system, that affects three files: /bin/ping (cap_net_raw) and /usr/lib/{x86_64,i386}-linux-gnu/gstreamer1.0/gstreamer-1.0/gst-ptp-helper (cap_net_bind_service and cap_net_admin).
+
+In short, the biggest thing missing is a shell script interpreter.
 
 ## Further Notes
 
@@ -98,3 +105,9 @@ As far as I can see, this happens at least for the following files:
 The main reason for this "conflict" is that we don't parse dpkg-divert calls yet.
 Why are these dynamic? This should be part of the control data!
 Anyway, parsing these is doomed to fail. You can inspect the list of active diversions on your system: `cat /var/lib/dpkg/diversions`
+
+The same happens with calls to update-alternative.
+
+### Dynamic caches
+
+Some packages install 0-byte files and populate them using precomputed data during install time. Most prominently, the aspell dictionaries do that.
